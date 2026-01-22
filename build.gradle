@@ -1,0 +1,87 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.2.0'
+	id 'io.spring.dependency-management' version '1.1.4'
+	id 'com.google.cloud.tools.jib' version '3.4.0'
+}
+
+group = 'vn.cloud'
+version = '0.0.5-SNAPSHOT'
+
+java {
+	sourceCompatibility = '17'
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+	agent
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	agent "io.opentelemetry.javaagent:opentelemetry-javaagent:1.32.0"
+
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	compileOnly 'org.projectlombok:lombok'
+	runtimeOnly 'org.postgresql:postgresql'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+task copyAgent(type: Copy) {
+	from configurations.agent {
+		rename "opentelemetry-javaagent-.*\\.jar", "opentelemetry-javaagent.jar"
+	}
+	into layout.buildDirectory.dir("agent")
+}
+
+bootJar {
+	dependsOn copyAgent
+
+	archiveFileName = "app.jar"
+}
+
+jib {
+	// https://hub.docker.com/_/amazoncorretto
+//	from.image = 'amazoncorretto:17.0.9-alpine'
+
+	// https://console.cloud.google.com/gcr/images/distroless/GLOBAL
+	from {
+		image = 'gcr.io/distroless/java17-debian12'
+		platforms {
+			platform {
+				architecture = 'arm64'
+				os = 'linux'
+			}
+		}
+	}
+
+	extraDirectories {
+		paths {
+			path {
+				from = layout.buildDirectory.dir("agent")
+				into = '/otelagent'
+			}
+		}
+	}
+
+	container {
+		jvmFlags = [
+		        '-javaagent:/otelagent/opentelemetry-javaagent.jar'
+		]
+	}
+}
+
+tasks.named('jibDockerBuild').configure {
+	dependsOn copyAgent
+}
