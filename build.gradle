@@ -55,6 +55,7 @@ jib {
 	// https://hub.docker.com/_/amazoncorretto
 //	from.image = 'amazoncorretto:17.0.9-alpine'
 
+
 	from {
 		image = 'gcr.io/distroless/java17-debian12'
 		platforms {
